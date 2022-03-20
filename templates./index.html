@@ -1,0 +1,116 @@
+{% include 'navbar.html' %}
+<!DOCTYPE html>
+{% block content %}
+<html lang="en" dir="ltr">
+  <head>
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" /> <!-- original: http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css -->
+<style>
+    div.ex1 {
+      width: 80%;
+      margin: auto;
+      border: 3px solid #73AD21;
+    }
+    div.ex2 {
+      padding-top: 10px;
+      margin: auto;
+      border: 3px solid #73AD21;
+    }
+    html, body, #container, #map {
+      padding: 0;
+      margin: 0;
+    }
+    html, body, #map, #container {
+    height: 600px;
+    }
+
+    </style>
+  <meta charset="utf-8">
+  <title></title>
+  </head>
+  <body>
+    <button onclick="getArea()"> Get area </button><br></br>
+    <button onclick="getAllpionts()">Get points</button><br></br>
+    <button onclick="clearLayers()">Clear</button>
+
+    <div class="ex2">
+      <div class="ex1">
+            <div id="map"></div>
+      </div>
+    </div>
+
+  </body>
+  <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+  <script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/leaflet.markercluster.js"></script>
+  <script type="text/javascript">
+
+    var tileLayer = new L.TileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',{
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
+    });
+
+    var map = new L.Map('map', {
+      'center': [51.75350586724182, -1.80169538827613],
+      'zoom': 8,
+      'layers': [tileLayer],
+      maxZoom: 19,
+      minZoom: 2,
+      max_bounds : 'True',
+      selectArea: true ,
+    });
+
+    map.on('click', addMarker);
+
+
+    var markerArray = []
+    var boundsArray = []
+
+    var markers = L.markerClusterGroup()
+
+    function addMarker(e){
+    if (markerArray.length == 10){
+      console.log("Max points reached")
+    }
+    else {
+      // Add marker to map at click location; add popup window
+      var newMarker = new L.marker(e.latlng)
+      markers.addLayer(newMarker);
+      map.addLayer(markers);
+      markerArray.push([newMarker.getLatLng().lng]);
+      markerArray.push([newMarker.getLatLng().lat]);
+      boundsArray.push([newMarker.getLatLng().lat, newMarker.getLatLng().lng])
+    }
+    }
+
+    function getAllpionts(){
+      // for (var i = 0; i < markerArray.length; i++) {
+      //   markerArray[i]
+      // }
+
+      if (markerArray.length < 4) {
+        console.log("Not enough markers")
+      }else{
+        var bounds = new L.LatLngBounds(boundsArray);
+
+        console.log(bounds)
+
+        console.log(markerArray)
+        $.ajax({
+                url: "/locations_send",
+                type: 'get',
+                data: {'locationArray[]': markerArray}
+            })
+      }
+    }
+
+    function clearLayers(){
+      console.log("Cleared")
+      markerArray = [];
+      markers.clearLayers();
+    }
+
+
+
+
+
+</script>
+</html>
+{% endblock %}
