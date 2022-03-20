@@ -20,7 +20,7 @@ import webbrowser
 
 
 
-ors_key = '5b3ce3597851110001cf624844229b68a7af4311b243a28407590a15'
+ors_key = 'not yet'
 
 
 def render_location(client, l):
