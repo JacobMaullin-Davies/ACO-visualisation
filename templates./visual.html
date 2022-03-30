@@ -21,6 +21,16 @@
     html, body, #map, #container {
     height: 600px;
     }
+    .select_area {
+      margin: 0 auto;
+      display: block;
+      text-align: center;
+    }
+    #button1, #button2, #button3{
+      width: 200px;
+      height: 40px;
+      }
+
 
     </style>
   <meta charset="utf-8">
@@ -28,8 +38,27 @@
   </head>
   <p></p>
   <body>
-    <button onclick="run_steps()">Run</button><br></br>
-    <button onclick="run_steps_2()">Run2</button><br></br>
+    <div class = "select_area">
+      <button id = "button1" onclick = "reset()">Reset</button>
+      <button id = "button2" onclick = "run_steps_2()">Run Vis</button>
+      <select name="algorithm" id="algo">
+        <option value="ACO-B">ACO-Basic</option>
+        <option value="ACO-B">ACO-Leaders</option>
+        <option value="ACO-B">ACO-Astar-Local</option>
+        <option value="DIJ">Dijkstra</option>
+        <option value="DFS">Depth-first-search</option>
+      </select>
+    </div>
+    <br>
+    <div class = "select_area">
+      <label for="quantity">Pheromone evaporate</label>
+      <input type="number" id="quantity" name="quantity" value="0.8" step="0.05" min="0.05" max="1">
+      <label for="quantity">Ant number</label>
+      <input type="number" id="ant_q" name="ant_q" value="50" step="2" min="2" max="100">
+    </div>
+
+      <br>
+
 
     <!-- <button onclick="start_vis()">Run</button><br></br> -->
 
@@ -39,12 +68,36 @@
       </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+    <canvas id="myChart" style="width:100%;max-width:600px"></canvas>
+
   </body>
   <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
   <script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/leaflet.markercluster.js"></script>
   <script type="text/javascript">
 
+    var xValues = [50,60,70,80,90,100,110,120,130,140,150];
+    var yValues = [7,8,8,9,9,9,10,11,14,14,15];
 
+    new Chart("myChart", {
+    type: "line",
+    data: {
+      labels: xValues,
+      datasets: [{
+        fill: false,
+        lineTension: 0,
+        backgroundColor: "rgba(0,0,255,1.0)",
+        borderColor: "rgba(0,0,255,0.1)",
+        data: yValues
+      }]
+    },
+    options: {
+      legend: {display: false},
+      scales: {
+        yAxes: [{ticks: {min: 6, max:16}}],
+      }
+    }
+    });
 
 
     var tileLayer = new L.TileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',{
@@ -55,11 +108,15 @@
     var bbox = {{bbox}}
     var isPaused = false;
     var final = false
+    var graph_ev = []
+
+    var polygonLines = L.markerClusterGroup({interactive: false})
+    var cirLines = L.layerGroup()
 
 
     var map = new L.Map('map', {
-      'center': [28.644800, 77.216721],
-      'zoom': 12,
+      'center': [51.75350586724182, -1.80169538827613],
+      'zoom': 10,
       'layers': [tileLayer],
       maxZoom: 19,
       minZoom: 2,
@@ -67,95 +124,141 @@
       selectArea: true ,
     });
 
-    map.fitBounds(bbox)
+    if(bbox.length != 0){
+        map.fitBounds(bbox)
+        var newMarker = new L.marker({{origin}}).addTo(map)
+        var newMarker = new L.marker({{dest}}).addTo(map)
 
-    var newMarker = new L.marker({{origin}}).addTo(map)
-    var newMarker = new L.marker({{dest}}).addTo(map)
+        var bounds = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]];
 
-    var bounds = [[bbox[1], bbox[0]], [bbox[3], bbox[2]]];
-
-    // create an orange rectangle
-    L.rectangle(bounds, {color: "#ff7800", weight: 1}).addTo(map);
-
-
-
-    function delay(time) {
-      return new Promise(resolve => setTimeout(resolve, time));
+        // create an orange rectangle
+        L.rectangle(bounds, {color: "#ff7800", weight: 1, clickable : false, hover: false}).addTo(map);
     }
 
-    function polystyle(feature) {
-    return {
-        fillColor: 'red',
-        weight: 2,
-        opacity: 1,
-        color: 'red',  //Outline color
-        fillOpacity: 0.7
-    };
+
+  function reset(){
+    isPaused = false;
+    final = false;
+    polygonLines.clearLayers()
+    polygonLines.setStyle({ color: 'blue'  });
+    cirLines.clearLayers()
+
+    $.ajax({
+            url: "/reset_path",
+            type: 'get',
+        })
+    location.reload()
   }
 
 
 
-    async function run_steps() {
+  function delay(time) {
+    return new Promise(resolve => setTimeout(resolve, time));
+  }
+
+  function evaporate(){
+    for (var i = 0; i < (graph_ev.length/2); i++) {
+      polygonLines.removeLayer(graph_ev[i])
+    }
+
+  }
+
+  async function show_points(){
       for (var i = 0; i < arr.length; i++) {
-
-        await delay(1);
-
-        var new_arr = arr.slice(i, i+2);
-
-        drawDottedLine(new_arr)
+        await delay(10);
+        var new_sarr = arr[i];
+        var cir = L.circle(new_sarr, 2)
+        cirLines.addLayer(cir)
+        cirLines.addTo(map)
       }
+  }
 
-      //drawDottedLine(arr)
+
+    async function run_steps(resp) {
+      if (arr.length > 0){
+        if(resp.runType == false){
+          for (var i = 0; i < arr.length; i+=19) {
+            await delay(1);
+            var new_arr = arr.slice(i, i+20);
+            drawDottedLine(new_arr)
+          }
+          if(!final){
+            evaporate()
+          }
+        }else{
+          show_points()
+      }
       $.ajax({
               url: "/path_finish",
               type: 'get',
           })
       isPaused = false;
     }
+  }
 
     function drawDottedLine(points){
       if (!final){
-        var polyline = new L.polyline(points).addTo(map);
+        var polyline = new L.polyline(points)
+        graph_ev.push(polyline)
+        polyline.setStyle({color: 'blue'});
+        polyline.addTo(polygonLines);
       }else{
         //console.log("RUN")
         var polyline = new L.polyline(points)
+        graph_ev.push(polyline)
         polyline.setStyle({color: 'red'});
-        polyline.addTo(map);
+        polyline.addTo(polygonLines);
       }
-
+      polygonLines.addTo(map) //add to map above
     }
-
-
 
     function run_steps_2(){
+      if (bbox.length != 0){
+        var e_a = document.getElementById("algo");
+        var algorithm = e_a.options[e_a.selectedIndex].text;
+        var e_pe = document.getElementById("quantity").value;
+        var ant_num  = document.getElementById("ant_q").value;
 
-
-      $.ajax({
-              url: "/path_start",
-              type: 'get',
-          })
-      var t = window.setInterval(function() {
-        if(!isPaused) {
-          fetch('../api_pointUpdate')
-          .then(response => response.json())
-          .then(resp => {
-          //console.log(resp.array);
-          if (resp.done){
-               console.log("FIN")
-               window.clearInterval(t);
-               final = true;
-               run_steps();
-
-          }else{
-            if (resp.running){
-              arr = resp.array;
-              isPaused = true;
-              run_steps()
+        console.log(e_pe,ant_num);
+        $.ajax({
+                url: "/path_start",
+                type: 'get',
+                data: {'a_type': algorithm,
+                       'evap_val': e_pe,
+                     }
+            })
+        var t = window.setInterval(function() {
+          if(!isPaused) {
+            fetch('../api_pointUpdate')
+            .then(response => response.json())
+            .then(resp => {
+            if (resp.done){
+                 console.log("FIN")
+                 window.clearInterval(t);
+                 final = true;
+                 arr = resp.array;
+                 run_steps(resp);
+            }else{
+              if (resp.running){
+                if(resp.array.length == 0){
+                  $.ajax({
+                          url: "/path_finish",
+                          type: 'get',
+                      })
+                  isPaused = false;
+                }else{
+                  arr = resp.array;
+                  isPaused = true;
+                  run_steps(resp)
+                }
+              }
             }
+          });
         }
-      });
+      }, 300);
     }
-  }, 500);}
+  }
+
 
 
 
