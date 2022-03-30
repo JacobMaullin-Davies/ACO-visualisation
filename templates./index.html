@@ -23,14 +23,80 @@
     height: 600px;
     }
 
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+
+    input:checked + .slider {
+      background-color: #2196F3;
+    }
+
+    input:focus + .slider {
+      box-shadow: 0 0 1px #2196F3;
+    }
+
+    input:checked + .slider:before {
+      -webkit-transform: translateX(26px);
+      -ms-transform: translateX(26px);
+      transform: translateX(26px);
+    }
+
+    .select_area {
+      margin: 0 auto;
+      display: block;
+      text-align: center;
+    }
+    #button1, #button2, #button3{
+      width: 200px;
+      height: 40px;
+      }
+
     </style>
   <meta charset="utf-8">
   <title></title>
   </head>
   <body>
-    <button onclick="getArea()"> Get area </button><br></br>
-    <button onclick="getAllpionts()">Get points</button><br></br>
-    <button onclick="clearLayers()">Clear</button>
+    <div class = "select_area">
+      <label class="switch">
+        <input type="checkbox">
+        <span class="slider" onclick="select_markers()"></span>
+      </label><br>
+    <button id = "button1"onclick="getAllpionts()">Get points</button><br>
+    <button id = "button1" onclick="clearLayers()">Clear</button>
+    </div>
 
     <div class="ex2">
       <div class="ex1">
@@ -48,8 +114,9 @@
     });
 
     var map = new L.Map('map', {
-      'center': [51.75350586724182, -1.80169538827613],
-      'zoom': 8,
+      // 'center': [51.75350586724182, -1.80169538827613],
+      'center':[51.292149, -2.463861],
+      'zoom': 12,
       'layers': [tileLayer],
       maxZoom: 19,
       minZoom: 2,
@@ -57,46 +124,85 @@
       selectArea: true ,
     });
 
-    map.on('click', addMarker);
-
-
-    var markerArray = []
+    var addAmarker = false
+    var addArea = false
+    var polygonLines = L.markerClusterGroup({interactive: false})
     var boundsArray = []
 
+    map.on('click', addOption);
+
+    function select_markers(){
+      if (addArea){
+        clearLayers();
+      }
+      addArea = (!addArea)
+
+    }
+
+    function addOption(e){
+      if (!addArea){
+        add_areatoselect(e)
+      }else{
+        addMarker(e)
+      }
+
+    }
+
+    function add_areatoselect(e){
+      try{
+        polygonLines.clearLayers()
+      }catch{
+        console.log("No area has been selected yet")
+      }
+      var newMarker = new L.marker(e.latlng)
+      var area_select = new L.Rectangle(new L.Circle([newMarker.getLatLng().lat,
+        newMarker.getLatLng().lng], 700).getBounds(),{color: "#ff7800", weight: 1, clickable : false, hover: false});
+      area_select.addTo(polygonLines);
+      polygonLines.addTo(map);
+
+      bounds = (area_select.getBounds())
+      console.log(bounds);
+      boundsArray = [bounds._southWest, bounds._northEast]
+      ajax_bounds = [bounds._southWest.lat, bounds._southWest.lng,
+                     bounds._northEast.lat, bounds._northEast.lng]
+
+    }
+
+    var markerArray = []
     var markers = L.markerClusterGroup()
 
     function addMarker(e){
-    if (markerArray.length == 10){
-      console.log("Max points reached")
+      if(boundsArray.length != 0){
+        if (markerArray.length == 4){
+          console.log("Max points reached")
+        }
+        else {
+          var newMarker = new L.marker(e.latlng)
+          console.log(boundsArray);
+          var bounds = new L.latLngBounds(boundsArray[0], boundsArray[1]);
+
+          if (bounds.contains(e.latlng)){
+            markers.addLayer(newMarker);
+            map.addLayer(markers);
+            markerArray.push([newMarker.getLatLng().lat]);
+            markerArray.push([newMarker.getLatLng().lng]);
+            console.log(markerArray)
+          }else{
+            console.log("not in area");
+          }
+      }
     }
-    else {
-      // Add marker to map at click location; add popup window
-      var newMarker = new L.marker(e.latlng)
-      markers.addLayer(newMarker);
-      map.addLayer(markers);
-      markerArray.push([newMarker.getLatLng().lng]);
-      markerArray.push([newMarker.getLatLng().lat]);
-      boundsArray.push([newMarker.getLatLng().lat, newMarker.getLatLng().lng])
-    }
-    }
+  }
 
     function getAllpionts(){
-      // for (var i = 0; i < markerArray.length; i++) {
-      //   markerArray[i]
-      // }
-
-      if (markerArray.length < 4) {
+      if (markerArray.length != 4) {
         console.log("Not enough markers")
       }else{
-        var bounds = new L.LatLngBounds(boundsArray);
-
-        console.log(bounds)
-
-        console.log(markerArray)
         $.ajax({
                 url: "/locations_send",
                 type: 'get',
-                data: {'locationArray[]': markerArray}
+                data: {'locationArray[]': markerArray,
+                      'bboxArray[]': ajax_bounds}
             })
       }
     }
