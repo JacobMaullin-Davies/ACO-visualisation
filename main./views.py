@@ -102,6 +102,8 @@ class PATH():
     running = False
     done = False
     run_type = False
+    toggle_pathNum = False
+    area_type = 'drive'
 
     def reset():
         PATH.path = []
@@ -112,12 +114,15 @@ class PATH():
         PATH.running = False
         PATH.done = False
         PATH.run_type = False
+        PATH.toggle_pathNum = False
+        PATH.area_type = 'drive'
 
     def stop():
         PATH.path = []
         PATH.running = False
         PATH.done = False
         PATH.run_type = False
+        PATH.toggle_pathNum = False
 
 
 def dijkstra_control(E):
@@ -209,6 +214,7 @@ def aco_control(E, type_of_al):
         PATH.done = True
 
     elif type_of_al == ['ACO-Leaders']:
+        sub_toggle = PATH.toggle_pathNum
         i = 0
         #PATH.running = True
         while i < E.fitness_evaluations:
@@ -216,24 +222,29 @@ def aco_control(E, type_of_al):
                 return_paths = E.ant_optimisation_lead()
                 if len(return_paths) > 1:
                     print(len(return_paths))
-                    PATH.path = return_paths[0]
+                    if sub_toggle:
+                        PATH.toggle_pathNum = True
+                        PATH.path = return_paths
+                    else:
+                        PATH.path = return_paths[0]
                     PATH.running = True
                     i+=1
                 else:
+                    PATH.toggle_pathNum = False
                     PATH.path = return_paths[0]
                     PATH.running = True
                     i+=1
             else:
                 time.sleep(0.05)
 
+
+        PATH.toggle_pathNum = False
         PATH.path = return_paths[0]
         #PATH.running = True
         time.sleep(1)
         PATH.done = True
     elif type_of_al == ['ACO-Astar-Local']:
         print("nop")
-
-
 
     #print("#########", PATH.path)
 
@@ -245,14 +256,21 @@ def reset_path_run(request):
 
 def vis_logic(request):
     type_of_al = request.GET.getlist("a_type")
-    print(type_of_al)
+    evaporation_val = request.GET.get("evap_val")
+    ant_num = request.GET.get("ant_num")
+    path_toggle = request.GET.get("path_toggle")
+    print(path_toggle)
+    if path_toggle == 'false':
+        PATH.toggle_pathNum = False
+    if path_toggle == 'true':
+        PATH.toggle_pathNum = True
     print("Starting visual")
 
     PATH.stop()
 
     e_inp = 0.84
 
-    E = Environment(PATH.logicbbox, PATH.origin, PATH.dest, 0.7, e_inp)
+    E = Environment(PATH.logicbbox, PATH.origin, PATH.dest, 0.7, e_inp, PATH.area_type)
     #E = Environment([[-3.190215, 51.51838], [-3.149435, 51.537751]], [51.530249, -3.177608], [51.52494521411801, -3.1640268228242125], 0.7, e_inp)
 
 
@@ -306,7 +324,11 @@ def vis_finish(request):
     return HttpResponse('Success')
 
 def points_api(request):
-    return JsonResponse({'array': PATH.path, 'running' : PATH.running, 'runType': PATH.run_type,'done': PATH.done})
+    return JsonResponse({'array': PATH.path,
+    'running' : PATH.running,
+    'runType': PATH.run_type,
+    'path_num' : PATH.toggle_pathNum,
+    'done': PATH.done})
 
 
 def grouped(iterable, n):
@@ -329,6 +351,10 @@ def simplfy(array):
 def locations(request):
     points_array = request.GET.getlist("locationArray[]")
     bbox_array = request.GET.getlist("bboxArray[]")
+    area_type = request.GET.get("areaType")
+
+    print(area_type)
+
 
     PATH.reset()
 
@@ -337,6 +363,10 @@ def locations(request):
 
     PATH.origin = points_array[0]
     PATH.dest = points_array[1]
+
+    PATH.area_type = area_type.lower()
+
+    print(PATH.area_type)
     #
     logic(bbox_array)
 
@@ -472,7 +502,7 @@ class Node():
 
 
 class Environment():
-    def __init__(self, bounding_box, origin_loc, destination_loc , p_inp, e_inp):
+    def __init__(self, bounding_box, origin_loc, destination_loc , p_inp, e_inp, area_type):
         self.vis_logic = True
         self.vis_running = False
         self.fitness_evaluations = 80
@@ -488,6 +518,7 @@ class Environment():
         self.adj_matrix = [[]]
         self.p_val = p_inp
         self.e_val = e_inp
+        self.area_type = area_type
         #//
         self.target_node = destination_loc
         self.start_node = origin_loc
@@ -495,6 +526,7 @@ class Environment():
         #//
         self.best_path = [[]]
         self.seen_nodes = []
+        self.best_oPath = []
         #//
         self.area()
         self.ant_innit()
@@ -503,8 +535,9 @@ class Environment():
 
 
     def area(self):
+        print(self.area_type)
         north, south, east, west = self.bbox[1][1], self.bbox[0][1], self.bbox[0][0],  self.bbox[1][0]
-        self.graph = ox.graph_from_bbox(north, south, east, west, network_type='drive')
+        self.graph = ox.graph_from_bbox(north, south, east, west, network_type=self.area_type)
         self.node_list = list(self.graph)
         self.adj_matrix = nx.adjacency_matrix(self.graph, nodelist=None, dtype=None, weight='weight')
         self.adj_matrix = self.adj_matrix.toarray(order=None, out=None)
@@ -677,18 +710,19 @@ class Environment():
 
 
     def ant_optimisation_astar(self):
-        for ant in self.antObjectList:
-            self.generate_ant_path(ant)
-        fit_ant_list = self.best_fitness_lead()
-        self.graph_update_lead(fit_ant_list)
-        self.evaporate_pheromone()
-
-        best_path_list = []
-        for ant in fit_ant_list:
-            best_path_list.append(self.gen_ant_xy(ant))
-
-        self.reset()
-        return best_path_list
+        print("niy")
+        # for ant in self.antObjectList:
+        #     self.generate_ant_path(ant)
+        # fit_ant_list = self.best_fitness_lead()
+        # self.graph_update_lead(fit_ant_list)
+        # self.evaporate_pheromone()
+        #
+        # best_path_list = []
+        # for ant in fit_ant_list:
+        #     best_path_list.append(self.gen_ant_xy(ant))
+        #
+        # self.reset()
+        # return best_path_list
 
     def ant_optimisation(self):
         for ant in self.antObjectList:
@@ -812,6 +846,12 @@ class Environment():
             for j in coords:
                 ant.xy_data.append(j)
 
+    def best_overallPath(self, path):
+        #overall best path, if the new best path from the ants is not a
+        #lower fitness than the prevous best path, then use the last best path again.
+        #lower the graph update slighty
+        print(self.best_oPath)
+
     def best_fitness_lead(self):
         cost = self.total_graph_length
         best_ant = None
@@ -834,7 +874,7 @@ class Environment():
         top_l = []
         if len(target_list) != 0:
             if len(target_list) > top_leaders_num:
-                while len(top_l) != 3:
+                while len(top_l) != top_leaders_num:
                     cost = target_list[0].path_fitness
                     best_ant = target_list[0]
                     for ant in target_list:
