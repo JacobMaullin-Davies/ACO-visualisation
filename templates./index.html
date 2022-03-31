@@ -90,10 +90,22 @@
   </head>
   <body>
     <div class = "select_area">
+      <label>Area Range</label>
+      <input id='range_search' name='range_search' type="range" value="700" min="100" max="5000">
+      <br>
       <label class="switch">
         <input type="checkbox">
         <span class="slider" onclick="select_markers()"></span>
-      </label><br>
+      </label>
+      <li> Toggle for area/location points</li>
+      <br>
+      <select id="area_type">
+        <option value="D">Drive</option>
+        <option value="W">Walk</option>
+        <option value="B">Bike</option>
+      </select>
+    </div>
+    <div class = "select_area">
     <button id = "button1"onclick="getAllpionts()">Get points</button><br>
     <button id = "button1" onclick="clearLayers()">Clear</button>
     </div>
@@ -154,9 +166,10 @@
       }catch{
         console.log("No area has been selected yet")
       }
+      var range_val = document.getElementById("range_search").value
       var newMarker = new L.marker(e.latlng)
       var area_select = new L.Rectangle(new L.Circle([newMarker.getLatLng().lat,
-        newMarker.getLatLng().lng], 700).getBounds(),{color: "#ff7800", weight: 1, clickable : false, hover: false});
+        newMarker.getLatLng().lng], range_val).getBounds(),{color: "#ff7800", weight: 1, clickable : false, hover: false});
       area_select.addTo(polygonLines);
       polygonLines.addTo(map);
 
@@ -198,11 +211,14 @@
       if (markerArray.length != 4) {
         console.log("Not enough markers")
       }else{
+        var area_type = document.getElementById("area_type");
+        area_type = area_type.options[area_type.selectedIndex].text;
         $.ajax({
                 url: "/locations_send",
                 type: 'get',
                 data: {'locationArray[]': markerArray,
-                      'bboxArray[]': ajax_bounds}
+                      'bboxArray[]': ajax_bounds,
+                      'areaType': area_type}
             })
       }
     }
