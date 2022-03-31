@@ -21,6 +21,58 @@
     html, body, #map, #container {
     height: 600px;
     }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 60px;
+      height: 34px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 26px;
+      width: 26px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      -webkit-transition: .4s;
+      transition: .4s;
+    }
+
+    input:checked + .slider {
+      background-color: #2196F3;
+    }
+
+    input:focus + .slider {
+      box-shadow: 0 0 1px #2196F3;
+    }
+
+    input:checked + .slider:before {
+      -webkit-transform: translateX(26px);
+      -ms-transform: translateX(26px);
+      transform: translateX(26px);
+    }
+
     .select_area {
       margin: 0 auto;
       display: block;
@@ -41,7 +93,7 @@
     <div class = "select_area">
       <button id = "button1" onclick = "reset()">Reset</button>
       <button id = "button2" onclick = "run_steps_2()">Run Vis</button>
-      <select name="algorithm" id="algo">
+      <select name="algorithm" id="algo" onchange="toggle()">
         <option value="ACO-B">ACO-Basic</option>
         <option value="ACO-B">ACO-Leaders</option>
         <option value="ACO-B">ACO-Astar-Local</option>
@@ -55,9 +107,22 @@
       <input type="number" id="quantity" name="quantity" value="0.8" step="0.05" min="0.05" max="1">
       <label for="quantity">Ant number</label>
       <input type="number" id="ant_q" name="ant_q" value="50" step="2" min="2" max="100">
+      <label>Speed</label>
+      <input id='speed_id' name='speed' type="range" value="15" min="1" max="20" onchange="speed_set()">
+      <br>
+          <br>
+      <div id="cont">
+        <label class="switch">
+          <input type="checkbox">
+          <span class="slider" onclick="toggle_ant_paths()"></span>
+        </label>
+      </div>
     </div>
 
-      <br>
+
+
+
+
 
 
     <!-- <button onclick="start_vis()">Run</button><br></br> -->
@@ -104,11 +169,17 @@
       attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
     });
 
-    var arr = [[]]
-    var bbox = {{bbox}}
+    var arr = [[]];
+    var bbox = {{bbox}};
     var isPaused = false;
-    var final = false
-    var graph_ev = []
+    var final = false;
+    var graph_ev = [];
+    var toggle_antPath_num = false;
+    var speed = document.getElementById('speed_id').value
+
+    var colors = [];
+
+    //var c = ['purple', 'green', 'orange']
 
     var polygonLines = L.markerClusterGroup({interactive: false})
     var cirLines = L.layerGroup()
@@ -139,15 +210,59 @@
   function reset(){
     isPaused = false;
     final = false;
-    polygonLines.clearLayers()
-    polygonLines.setStyle({ color: 'blue'  });
-    cirLines.clearLayers()
+    try{
+      polygonLines.clearLayers()
+      polygonLines.setStyle({ color: 'blue'  });
+    }catch{
+      console.log("No lines to clear")
+    }
+    try{
+      cirLines.clearLayers()
+    }catch{
+      console.log("No lines to clear")
+    }
+
 
     $.ajax({
             url: "/reset_path",
             type: 'get',
         })
-    location.reload()
+    //location.reload()
+  }
+
+  function speed_set(){
+    speed = document.getElementById('speed_id').value
+    console.log(speed);
+  }
+
+  function toggle(){
+    var cont = document.getElementById('cont');
+    var e_a = document.getElementById("algo");
+    var algorithm = e_a.options[e_a.selectedIndex].text;
+    console.log(algorithm)
+    if (algorithm == 'ACO-Basic'){
+        cont.style.display = 'block';
+    }else if (algorithm == 'ACO-Leaders') {
+      cont.style.display = 'block';
+    }else if (algorithm == 'ACO-Astar-Local'){
+      cont.style.display = 'block';
+    }else{
+      cont.style.display = 'none';
+    }
+  }
+
+
+  function toggle_ant_paths(){
+    toggle_antPath_num = !toggle_antPath_num
+    console.log(toggle_antPath_num)
+  }
+
+  function path_finish(){
+    $.ajax({
+            url: "/path_finish",
+            type: 'get',
+        })
+    isPaused = false;
   }
 
 
@@ -157,7 +272,7 @@
   }
 
   function evaporate(){
-    for (var i = 0; i < (graph_ev.length/2); i++) {
+    for (var i = 0; i < (graph_ev.length/1.7); i++) {
       polygonLines.removeLayer(graph_ev[i])
     }
 
@@ -165,48 +280,59 @@
 
   async function show_points(){
       for (var i = 0; i < arr.length; i++) {
-        await delay(10);
+        await delay(1);
         var new_sarr = arr[i];
         var cir = L.circle(new_sarr, 2)
         cirLines.addLayer(cir)
         cirLines.addTo(map)
       }
+      path_finish()
   }
 
 
     async function run_steps(resp) {
       if (arr.length > 0){
         if(resp.runType == false){
-          for (var i = 0; i < arr.length; i+=19) {
-            await delay(1);
-            var new_arr = arr.slice(i, i+20);
-            drawDottedLine(new_arr)
+          if(resp.path_num){
+            console.log(arr.length)
+            for (var i = 0; i < arr.length; i++) {
+              var break_arr = arr[i]
+              console.log(i)
+              drawDottedLine(break_arr, colors[i])
+            }
+            if(!final){
+              console.log("called")
+              evaporate()
+            }
+          }else{
+              console.log(speed);
+            for (var i = 0; i < arr.length; i+=19) {
+              await delay(1);
+              var new_arr = arr.slice(i, i+20);
+              drawDottedLine(new_arr, colors[0])
+            }
           }
           if(!final){
             evaporate()
           }
+          path_finish()
         }else{
           show_points()
       }
-      $.ajax({
-              url: "/path_finish",
-              type: 'get',
-          })
-      isPaused = false;
+
     }
   }
 
-    function drawDottedLine(points){
+    function drawDottedLine(points, cc){
       if (!final){
         var polyline = new L.polyline(points)
         graph_ev.push(polyline)
-        polyline.setStyle({color: 'blue'});
+        polyline.setStyle({color: cc, opacity: 0.1});
         polyline.addTo(polygonLines);
       }else{
-        //console.log("RUN")
         var polyline = new L.polyline(points)
         graph_ev.push(polyline)
-        polyline.setStyle({color: 'red'});
+        polyline.setStyle({color: 'red', opacity: 0.9});
         polyline.addTo(polygonLines);
       }
       polygonLines.addTo(map) //add to map above
@@ -219,12 +345,21 @@
         var e_pe = document.getElementById("quantity").value;
         var ant_num  = document.getElementById("ant_q").value;
 
-        console.log(e_pe,ant_num);
+        while (colors.length < Math.round(ant_num*0.1)) {
+            do {
+                var color = Math.floor((Math.random()*1000000)+1);
+            } while (colors.indexOf(color) >= 0);
+            colors.push("#" + ("000000" + color.toString(16)).slice(-6));
+        }
+        console.log(colors);
+
         $.ajax({
                 url: "/path_start",
                 type: 'get',
                 data: {'a_type': algorithm,
                        'evap_val': e_pe,
+                       'ant_num': ant_num,
+                       'path_toggle': toggle_antPath_num
                      }
             })
         var t = window.setInterval(function() {
