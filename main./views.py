@@ -104,6 +104,8 @@ class PATH():
     run_type = False
     toggle_pathNum = False
     area_type = 'drive'
+    fitness_ofpath = 0
+
 
     def reset():
         PATH.path = []
@@ -116,19 +118,20 @@ class PATH():
         PATH.run_type = False
         PATH.toggle_pathNum = False
         PATH.area_type = 'drive'
+        PATH.fitness_ofpath = 0
 
     def stop():
         PATH.path = []
         PATH.running = False
         PATH.done = False
         PATH.run_type = False
-        PATH.toggle_pathNum = False
+        #PATH.toggle_pathNum = False
 
 
 def dijkstra_control(E):
-    best_path, total_vis = E.dijkstra_run()
+    best_path, total_vis, fitness = E.dijkstra_run()
 
-    print(best_path)
+    print(fitness)
 
 
 
@@ -145,6 +148,7 @@ def dijkstra_control(E):
 
 
     if PATH.running == False:
+        PATH.fitness_ofpath = fitness
         PATH.run_type = True
         PATH.path = total_vis
         PATH.running = True
@@ -158,12 +162,13 @@ def dijkstra_control(E):
 
 
 def d_first_search_control(E):
-    found_ant = E.initial_search()
+    found_ant, fitness = E.initial_search()
     # for i in found_ant.visited_nodes:
     #     print(i.node)
     #     print(i.adj_list)
 
     if PATH.running == False:
+        PATH.fitness_ofpath = fitness
         PATH.run_type = True
         PATH.path = found_ant.path
         PATH.running = True
@@ -175,53 +180,66 @@ def d_first_search_control(E):
     time.sleep(1)
     PATH.done = True
 
-    # PATH.path = found_ant.xy_data
-    # PATH.running = True
-    # time.sleep(1)
-    # PATH.done = True
-
-def aco_not_show(E):
-    i = 0
-
-    while i < E.fitness_evaluations:
-        return_path = E.ant_optimisation()
-        print(i)
-        PATH.path = return_path
-        i+=1
-
-    PATH.path = return_path
-    PATH.running = True
-    time.sleep(1)
-    PATH.done = True
-
 
 def aco_control(E, type_of_al):
-
+    sub_toggle = PATH.toggle_pathNum
     if type_of_al == ['ACO-Basic']:
-        i = 0
-        #PATH.running = True
-        while i < E.fitness_evaluations:
-            if PATH.running == False:
-                return_path = E.ant_optimisation()
-                PATH.path = return_path
-                PATH.running = True
-                i+=1
-            else:
-                time.sleep(0.05)
-        PATH.path = return_path
-        #PATH.running = True
-        time.sleep(1)
-        PATH.done = True
+        if sub_toggle:
+            basic = True
+            i = 0
+            while i < E.fitness_evaluations:
+                if PATH.running == False:
+                    return_paths, best_fitness = E.ant_optimisation_lead(basic)
+                    PATH.fitness_ofpath = best_fitness
+                    if len(return_paths) > 1:
+                        if sub_toggle:
+                            PATH.toggle_pathNum = True
+                            PATH.path = return_paths
+                        else:
+                            PATH.path = return_paths[0]
+                        PATH.running = True
+                        i+=1
+                    else:
+                        PATH.toggle_pathNum = False
+                        PATH.path = return_paths[0]
+                        PATH.running = True
+                        i+=1
+                else:
+                    time.sleep(0.05)
+
+            PATH.toggle_pathNum = False
+            PATH.path = return_paths[0]
+            #PATH.running = True
+            time.sleep(1)
+            PATH.done = True
+
+        else:
+            i = 0
+            #PATH.running = True
+            while i < E.fitness_evaluations:
+                if PATH.running == False:
+                    return_path, best_fitness = E.ant_optimisation()
+                    PATH.path = return_path
+                    PATH.fitness_ofpath = best_fitness
+                    PATH.running = True
+                    i+=1
+                else:
+                    time.sleep(0.05)
+            PATH.path = return_path
+            #PATH.running = True
+            time.sleep(1)
+            PATH.done = True
+
 
     elif type_of_al == ['ACO-Leaders']:
-        sub_toggle = PATH.toggle_pathNum
+        basic = False
         i = 0
         #PATH.running = True
         while i < E.fitness_evaluations:
             if PATH.running == False:
-                return_paths = E.ant_optimisation_lead()
+                return_paths, best_fitness = E.ant_optimisation_lead(basic)
+                PATH.fitness_ofpath = best_fitness
                 if len(return_paths) > 1:
-                    print(len(return_paths))
                     if sub_toggle:
                         PATH.toggle_pathNum = True
                         PATH.path = return_paths
@@ -244,7 +262,36 @@ def aco_control(E, type_of_al):
         time.sleep(1)
         PATH.done = True
     elif type_of_al == ['ACO-Astar-Local']:
-        print("nop")
+        i = 0
+        #PATH.running = True
+        while i < E.fitness_evaluations:
+            if PATH.running == False:
+                return_paths, best_fitness = E.ant_optimisation_astar()
+                PATH.fitness_ofpath = best_fitness
+                PATH.toggle_pathNum = False
+                PATH.path = return_paths[0]
+                PATH.running = True
+                i+=1
+                # print(len(return_paths))
+                # if len(return_paths) > 1:
+                #     print(len(return_paths))
+                #     if sub_toggle:
+                #         PATH.toggle_pathNum = True
+                #         PATH.path = return_paths
+                #     else:
+                #         PATH.path = return_paths[0]
+                #     PATH.running = True
+                #     i+=1
+                # else:
+            else:
+                time.sleep(0.05)
+
+
+        PATH.toggle_pathNum = False
+        PATH.path = return_paths[0]
+        #PATH.running = True
+        time.sleep(1)
+        PATH.done = True
 
     #print("#########", PATH.path)
 
@@ -258,7 +305,9 @@ def vis_logic(request):
     type_of_al = request.GET.getlist("a_type")
     evaporation_val = request.GET.get("evap_val")
     ant_num = request.GET.get("ant_num")
+    evaluations = request.GET.get("eval_num")
     path_toggle = request.GET.get("path_toggle")
+
     print(path_toggle)
     if path_toggle == 'false':
         PATH.toggle_pathNum = False
@@ -268,11 +317,9 @@ def vis_logic(request):
 
     PATH.stop()
 
-    e_inp = 0.84
+    E = Environment(PATH.logicbbox, PATH.origin, PATH.dest, int(ant_num), float(evaporation_val), int(evaluations), PATH.area_type)
 
-    E = Environment(PATH.logicbbox, PATH.origin, PATH.dest, 0.7, e_inp, PATH.area_type)
-    #E = Environment([[-3.190215, 51.51838], [-3.149435, 51.537751]], [51.530249, -3.177608], [51.52494521411801, -3.1640268228242125], 0.7, e_inp)
-
+    print("done processing")
 
     if type_of_al == ['ACO-Basic']:
         aco_control(E, type_of_al)
@@ -328,6 +375,7 @@ def points_api(request):
     'running' : PATH.running,
     'runType': PATH.run_type,
     'path_num' : PATH.toggle_pathNum,
+    'fitness' : PATH.fitness_ofpath,
     'done': PATH.done})
 
 
@@ -352,8 +400,6 @@ def locations(request):
     points_array = request.GET.getlist("locationArray[]")
     bbox_array = request.GET.getlist("bboxArray[]")
     area_type = request.GET.get("areaType")
-
-    print(area_type)
 
 
     PATH.reset()
@@ -502,11 +548,11 @@ class Node():
 
 
 class Environment():
-    def __init__(self, bounding_box, origin_loc, destination_loc , p_inp, e_inp, area_type):
+    def __init__(self, bounding_box, origin_loc, destination_loc, ant_num, e_inp, fit_elvaluations, area_type):
         self.vis_logic = True
         self.vis_running = False
-        self.fitness_evaluations = 80
-        self.numeber_ofANTobjects = 50
+        self.fitness_evaluations = fit_elvaluations
+        self.numeber_ofANTobjects = ant_num
         self.total_graph_length = 0
         self.bbox = bounding_box
         self.graph = None
@@ -516,7 +562,6 @@ class Environment():
         #//
         self.node_list = []
         self.adj_matrix = [[]]
-        self.p_val = p_inp
         self.e_val = e_inp
         self.area_type = area_type
         #//
@@ -526,11 +571,18 @@ class Environment():
         #//
         self.best_path = [[]]
         self.seen_nodes = []
-        self.best_oPath = []
         #//
+        # if (self.preload):
+        #     self.area()
+        #     self.ant_innit()
+        #     self.map_fitness()
+        # else:
+        #     self.graph_reset()
         self.area()
         self.ant_innit()
         self.map_fitness()
+
+
         #self.main_run()
 
 
@@ -549,10 +601,16 @@ class Environment():
         self.target_node = ox.distance.nearest_nodes(self.graph, self.target_node[1], self.target_node[0])
 
         c = 0
+        start_li = []
         for node in self.nodeObjectList:
             if self.start_node == node.node:
-                return [node,c]
+                start_li = [node,c]
+            if self.target_node == node.node:
+                self.target_li = node
             c+=1
+
+
+        return start_li
 
     def ant_innit(self):
         s_node = self.set_targets()
@@ -612,12 +670,67 @@ class Environment():
 #         print(self.gdf_nodes["osmid"])
 
 
+    # def graph_reset(self):
+    #     for node in self.nodeObjectList:
+    #         node.p = self.pheromone(node.adj_list)
+    #
+    #     self.reset()
+
+
+
+
+
+
+    def post_innit_search(self, ant):
+
+        for m in ant.visited_nodes:
+            print(m.node)
+
+        def loop_innit(cuur_list, new_list, s):
+            for curr_node in cuur_list:
+                index = np.where(cuur_list == curr_node)
+                index = index[0][0]
+                for next in new_list[index+2:]:
+                    if next.node in curr_node.adj_list:
+                        np.append(s, curr_node)
+                        n_index = np.where(new_list == next)
+                        new_list = new_list[n_index[0][0]:]
+                        arr = np.concatenate((s, new_list))
+                        return arr, new_list, new_list, False
+
+            return s, new_list, new_list, True
+
+        new_list = []
+        for cc in range(len(ant.visited_nodes)-1):
+            if ant.visited_nodes[cc].node != ant.visited_nodes[cc+1].node:
+                new_list.append(ant.visited_nodes[cc])
+                cc+=1
+            else:
+                cc+=1
+
+
+        new_list = np.array(new_list)
+        cuur_list = new_list
+        s = []
+        s = np.array(s)
+        end =  False
+        while not end:
+            s, cuur_list, new_list, end = loop_innit(cuur_list, new_list, s)
+
+        print("~~~~~~~~~~")
+        for m in s:
+            print(m.node)
+
+        return s
+
+
     def initial_search(self):
         #gdf_nodes, gdf_edges = ox.graph_to_gdfs(self.graph,nodes=True, edges=True,node_geometry=True,fill_edge_geometry=True)
         for ant in self.antObjectList:
             self.find_init_path(ant)
             if self.found:
                 print("FOUND")
+                #ss = self.post_innit_search(ant)
                 self.set_xy_data(ant)
                 total_vis = []
                 for node_visted in ant.path:
@@ -627,16 +740,11 @@ class Environment():
                     temp.append(node_xy["x"])
                     total_vis.append(temp)
                 ant.path = total_vis
-                return ant
+                return ant, ant.path_fitness
 
         if self.found == False:
             print("Could not find a path")
             return self.antObjectList[0]
-
-
-        # self.set_xy_data(self.antObjectList[0])
-        #
-        # return self.antObjectList[0]
 
     def dijkstra_run(self):
 
@@ -645,6 +753,8 @@ class Environment():
         length_graph = gdf_edges['length']
 
         shortest_path, distance, total_order = self.dijkstra(self.graph, length_graph, self.start_node, self.target_node)
+
+        print("LAST", distance)
 
         total_vis = []
         for node_visted in total_order:
@@ -657,7 +767,7 @@ class Environment():
         shortest_path = self.dijkstra_xy(shortest_path)
 
 
-        return shortest_path, total_vis
+        return shortest_path, total_vis, distance
 
     # def main_run(self):
     #
@@ -692,12 +802,15 @@ class Environment():
         # gdf_edges[gdf_edges.length > 10].plot(ax=ax, cmap="viridis", column="length", legend=True)
         # plt.show()
 
-    def ant_optimisation_lead(self):
+    def ant_optimisation_lead(self, basic):
         for ant in self.antObjectList:
             self.generate_ant_path(ant)
         fit_ant_list = self.best_fitness_lead()
-        print(fit_ant_list)
-        self.graph_update_lead(fit_ant_list)
+        best_fitness = fit_ant_list[0].path_fitness
+        if basic:
+            self.graph_update(fit_ant_list[0])
+        else:
+            self.graph_update_lead(fit_ant_list)
         self.evaporate_pheromone()
 
         best_path_list = []
@@ -706,34 +819,43 @@ class Environment():
             best_path_list.append(self.gen_ant_xy(ant))
 
         self.reset()
-        return best_path_list
+        return best_path_list, best_fitness
 
 
     def ant_optimisation_astar(self):
-        print("niy")
-        # for ant in self.antObjectList:
-        #     self.generate_ant_path(ant)
-        # fit_ant_list = self.best_fitness_lead()
-        # self.graph_update_lead(fit_ant_list)
-        # self.evaporate_pheromone()
-        #
-        # best_path_list = []
-        # for ant in fit_ant_list:
-        #     best_path_list.append(self.gen_ant_xy(ant))
-        #
-        # self.reset()
-        # return best_path_list
+        for ant in self.antObjectList:
+            self.generate_antStar_path(ant)
+        fit_ant_list = self.best_fitness_lead()
+        best_fitness = fit_ant_list[0].path_fitness
+
+        # if basic:
+        #     self.graph_update(fit_ant_list[0])
+        # else:
+        #     self.graph_update_lead(fit_ant_list)
+
+        self.graph_update(fit_ant_list[0])
+        self.evaporate_pheromone()
+
+        best_path_list = []
+
+        for ant in fit_ant_list:
+            best_path_list.append(self.gen_ant_xy(ant))
+
+        self.reset()
+
+        return best_path_list, best_fitness
 
     def ant_optimisation(self):
         for ant in self.antObjectList:
             self.generate_ant_path(ant)
         fit_ant = self.best_fitness()
-        best_path = self.gen_ant_xy(fit_ant)
+        best_fitness = fit_ant.path_fitness
         self.graph_update(fit_ant)
         self.evaporate_pheromone()
+        best_path = self.gen_ant_xy(fit_ant)
         # best_path = [n.node for n in fit_ant.path]
         self.reset()
-        return best_path
+        return best_path, best_fitness
 
     def reset(self):
         for ant in self.antObjectList:
@@ -744,6 +866,15 @@ class Environment():
             ant.target = False
             ant.xy_data = []
 
+    def target_Pupdate(self):
+        for i in self.target_li.loc:
+            node = self.nodeObjectList[i]
+            c = 0
+            for j in node.adj_list:
+                if j == self.target_li.node:
+                    node.p[c] = 1
+                c+=1
+
     def evaporate_pheromone(self):
         for node in self.nodeObjectList:
             temp_p = []
@@ -753,6 +884,7 @@ class Environment():
                 else:
                     temp_p.append(pher*self.e_val)
             node.p = temp_p
+        self.target_Pupdate()
 
     def graph_update_lead(self, ant_list):
         for ant_obj in ant_list:
@@ -805,7 +937,7 @@ class Environment():
         for i in range(len(path)-1):
             current_node_dict = self.node_dict(path[i])
             try:
-                coords = self.get_lineObject(current_node_dict[path[i+1]], path[i+1])
+                coords, edge_cost = self.get_lineObject(current_node_dict[path[i+1]], path[i+1])
                 for j in coords:
                     lineObject_xy.append(j)
             except:
@@ -819,7 +951,7 @@ class Environment():
     def gen_ant_xy(self, ant):
         for i in range(len(ant.path)-1):
             current_node_dict = self.node_dict(ant.path[i].node)
-            coords = self.get_lineObject(current_node_dict[ant.path[i+1].node], ant.path[i+1].node)
+            coords, edge_cost = self.get_lineObject(current_node_dict[ant.path[i+1].node], ant.path[i+1].node)
             for j in coords:
                 ant.xy_data.append(j)
 
@@ -841,20 +973,18 @@ class Environment():
         ant.xy_data = []
         for i in range(len(list_nnn)-1):
             current_node_dict = self.graph.__getitem__(list_nnn[i].node)
-            coords = self.get_lineObject(current_node_dict[list_nnn[i+1].node], list_nnn[i+1].node)
+            coords, edge_cost = self.get_lineObject(current_node_dict[list_nnn[i+1].node], list_nnn[i+1].node)
+            ant.path_fitness += edge_cost
             #fit += current_node_dict[list_nnn[i+1].node][0]['length']
             for j in coords:
                 ant.xy_data.append(j)
 
-    def best_overallPath(self, path):
-        #overall best path, if the new best path from the ants is not a
-        #lower fitness than the prevous best path, then use the last best path again.
-        #lower the graph update slighty
-        print(self.best_oPath)
 
     def best_fitness_lead(self):
         cost = self.total_graph_length
-        best_ant = None
+        #best_ant = None
+        best_ant = self.antObjectList[0]
+        cost = self.total_graph_length
 
         target_list = []
         for ant in self.antObjectList:
@@ -885,13 +1015,26 @@ class Environment():
                     top_l.append(best_ant)
                 return top_l
             else:
-                return target_list
+                l = len(target_list)
+                while len(top_l) != l:
+                    cost = target_list[0].path_fitness
+                    best_ant = target_list[0]
+                    for ant in target_list:
+                        if ant.path_fitness < cost:
+                            cost = ant.path_fitness
+                            best_ant = ant
+                    target_list.remove(best_ant)
+                    top_l.append(best_ant)
+                return top_l
 
         return [best_ant]
 
     def best_fitness(self):
         cost = self.total_graph_length
-        best_ant = None
+        #print(self.antObjectList)
+        best_ant = self.antObjectList[0]
+
+        cost = self.total_graph_length
 
         target_list = []
         for ant in self.antObjectList:
@@ -923,31 +1066,6 @@ class Environment():
         return self.nodeObjectList[index]
 
     def get_adjacentNodes(self, node):
-
-        # t_node = self.graph.nodes[self.target_node]
-        # x2 = t_node["x"]
-        # y2 = t_node["y"]
-
-        # el = 100
-        #
-        #
-        # j = 0
-        # n_d = 0
-        # for i in node.adj_list:
-        #     info = self.graph.nodes[i]
-        #     x1 = info["x"]
-        #     y1 = info["y"]
-        #     euclidean_dist_vec = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-        #     if euclidean_dist_vec < el:
-        #         el = euclidean_dist_vec
-        #         n_d = np.where(node.adj_list == i)
-        #         n_d = n_d[0][0]
-        #     j+=1
-        #
-        # node.p[n_d] + 0.05
-        # if node.p[n_d] > 1:
-        #     node.p[n_d] = 0.91
-
         edges = [i for i in range(len(node.loc))]
 
         chosen_edge = random.choices(edges, node.p)
@@ -958,6 +1076,7 @@ class Environment():
         coords = []
         try:
             lineObject = node_dict[0]['geometry']
+
             x,y = lineObject.coords.xy
             for i in range(len(x)):
                 temp = []
@@ -970,7 +1089,9 @@ class Environment():
             temp.append(node_xy["y"])
             temp.append(node_xy["x"])
             coords.append(temp)
-        return coords
+
+        length = node_dict[0]['length']
+        return coords, length
 
 
     def get_initadjacentNodes(self, node):
@@ -1033,6 +1154,7 @@ class Environment():
                 # if we found a shorter path
                 path = dist[curr] + cost(curr, neighbor)
                 if path < dist[neighbor]:
+                    #print(path)
                     # update the distance, we found a shorter one
                     dist[neighbor] = path
                     # update the previous node to be prev on new shortest path
@@ -1048,6 +1170,9 @@ class Environment():
                         _ = pq.get((dist[neighbor],neighbor))
                         # insert new
                         pq.put((dist[neighbor],neighbor))
+
+
+
 
                 #print(path_list)
             # we are done after every possible path has been checked
@@ -1085,6 +1210,110 @@ class Environment():
                 ant.reset()
                 break
             edge_choice = self.get_adjacentNodes(iterator_node)
+            ant.path_index.append(iterator_node.loc[edge_choice])
+            node_choice = iterator_node.adj_list[edge_choice]
+            current_node_dict = self.graph.__getitem__(iterator_node.node)
+            edge_fitness = self.evaluate_fitness(current_node_dict[node_choice], ant)
+            ant.path_fitness += edge_fitness
+            next_node = self.next_nodeObject(iterator_node.loc[edge_choice])
+            if next_node.node == self.target_node:
+                ant.path.append(next_node)
+                ant.path_index.append(iterator_node.loc[edge_choice])
+                ant.target = True
+                break
+            iterator_node = next_node
+
+
+    #make euclidean_dist_vec funct
+
+    def dist_fromorigin(self, node):
+        curr_node = self.graph.nodes[node]
+        x1 = curr_node["x"]
+        y1 = curr_node["y"]
+
+        t_node = self.graph.nodes[self.start_node]
+        x2 = t_node["x"]
+        y2 = t_node["y"]
+
+        euclidean_dist_vec = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+
+        return euclidean_dist_vec
+
+
+    def dist_fromtarget(self, node):
+        curr_node = self.graph.nodes[node]
+        x1 = curr_node["x"]
+        y1 = curr_node["y"]
+
+        t_node = self.graph.nodes[self.target_node]
+        x2 = t_node["x"]
+        y2 = t_node["y"]
+
+        euclidean_dist_vec = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+
+        return euclidean_dist_vec
+
+
+    def a_star_funct(self, node, o_list, t_list):
+
+        Q = 1
+
+        fn = []
+
+        for i in range(len(node.adj_list)):
+            n_ij = Q / (o_list[i] + t_list[i])
+            fn.append(n_ij)
+
+        return fn
+
+
+    def aStar_distance(self, node):
+        dist_o = []
+        dist_t = []
+        a_starli = []
+        for i in node.adj_list:
+            distf_origin = self.dist_fromorigin(i)
+            dist_o.append(distf_origin)
+            distf_target = self.dist_fromtarget(i)
+            dist_t.append(distf_target)
+
+        p_upd = self.a_star_funct(node, dist_o, dist_t)
+        a_starli = [sorted(p_upd).index(x) for x in p_upd]
+        a_starli = np.array(a_starli)
+
+        # pval = 0.08
+        # for j in range(len(node.p)):
+        #     index = np.where(a_starli == j)
+        #     node.p[index[0][0]] += pval
+        #     if node.p[index[0][0]] > 1:
+        #         node.p[index[0][0]] = 0.91
+        #     pval /= 2
+
+        pval = 0.05
+        index = np.where(a_starli == 0)
+        node.p[index[0][0]] += pval
+        if node.p[index[0][0]] > 1:
+            node.p[index[0][0]] = 0.91
+
+        edges = [i for i in range(len(node.loc))]
+        chosen_edge = random.choices(edges, node.p)
+
+        return chosen_edge[0]
+
+
+    def generate_antStar_path(self, ant):
+        iterator_node = ant.starting_node[0]
+        for _ in range(int(len(self.graph.nodes))):
+            ant.path.append(iterator_node)
+            if len(iterator_node.adj_list) == 0:
+                ant.reset()
+                break
+
+            if self.found:
+                print("2nd run")
+                edge_choice = self.aStar_distance(iterator_node)
+            else:
+                edge_choice = self.get_adjacentNodes(iterator_node)
             ant.path_index.append(iterator_node.loc[edge_choice])
             node_choice = iterator_node.adj_list[edge_choice]
             current_node_dict = self.graph.__getitem__(iterator_node.node)
