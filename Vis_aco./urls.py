@@ -16,6 +16,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 from main import views as main_view
+from django.conf.urls.static import static
+from django.conf import settings
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,6 +26,9 @@ urlpatterns = [
     path("locations_send/", main_view.locations),
     path("api_pointUpdate/", main_view.points_api),
     path("path_start/", main_view.vis_logic),
-    path("path_finish/", main_view.vis_finish)
+    path("path_finish/", main_view.vis_finish),
+    path("reset_path", main_view.reset_path_run)
 
 ]
+
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
