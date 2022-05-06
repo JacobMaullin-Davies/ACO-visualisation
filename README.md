@@ -39,27 +39,27 @@ The iteration fitness overtime is shown on the chart below the map.
 
  1. To create an environment:
 
- conda create -n djangoenv python=3.8.12 anaconda  
+ `conda create -n djangoenv python=3.8.12 anaconda`  
 
  (djangoenv can be any name for the environment, use specified python version )
 
  2. Proceed with 'y' when prompted
 
- proceed ([y]/n)?
+ `proceed ([y]/n)?`
 
  When the environment has been initialised, proceed to the next steps:
 
  3. Activate the environment
 
- conda activate djangoenv
+ `conda activate djangoenv`
 
  4. Installation of OSMnx
 
- conda install -c conda-forge osmnx
+ `conda install -c conda-forge osmnx`
 
  5. Installation of Django
 
- conda install -c anaconda django
+ `conda install -c anaconda django`
 
  (django should be version 3.1.2)
 
@@ -68,11 +68,11 @@ The iteration fitness overtime is shown on the chart below the map.
 
  1. To run the django application, navigate to:
 
- cd ../env_django/aco_prototype
+ `cd ../env_django/aco_prototype`
 
  2. In this directory, to run the server:
 
- python manage.py runserver
+ `python manage.py runserver`
 
  (If you are on a Mac or Linux, use python3 manage.py runserver instead of the command given above)
 
@@ -92,11 +92,11 @@ The iteration fitness overtime is shown on the chart below the map.
  * Troubleshooting
 
     Ensure that OpenRouteService API key is valid:
-    Navigate to directory:  ../env_django/aco_prototype/main
+    Navigate to directory:  `../env_django/aco_prototype/main`
 
     in views.py file line 28
 
-          ors_key = " "
+    ors_key = "API_KEY_HERE"
 
     Ensure the key is valid, otherwise use own key
 
