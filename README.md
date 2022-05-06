@@ -1,7 +1,7 @@
-Visualisation of ACO project readme
+Visualisation of ACO project
 ---------------------
 
- * Introduction
+* Introduction
 
 -Index (Home) page
 
@@ -24,14 +24,14 @@ The 'Reset' button will clear all current paths on the map.
 The iteration fitness overtime is shown on the chart below the map.
 
 
- * Requirements
+* Requirements
 
  Anaconda - https://www.anaconda.com/
  OSMnx - street network data acquisition https://osmnx.readthedocs.io/en/stable/
  OpenRouteService API Key - provided in this application with free trial.
  Therefore limited number of requests can be made per hour/day.
 
- * Installation
+* Installation
 
  Firstly, install anaconda to workspace.  Once downloaded, open the Anaconda Prompt console
 
@@ -64,7 +64,7 @@ The iteration fitness overtime is shown on the chart below the map.
  (django should be version 3.1.2)
 
 
- * Configuration
+* Configuration
 
  1. To run the django application, navigate to:
 
@@ -78,11 +78,11 @@ The iteration fitness overtime is shown on the chart below the map.
 
  The terminal should output a similar message, with a URL will generated on the command line.
 
-  System check identified no issues (0 silenced).
-  May 06, 2022 - 15:51:30
-  Django version 3.1.2, using settings 'Vis_aco.settings'
-  Starting development server at http://127.0.0.1:8000/
-  Quit the server with CTRL-BREAK.
+ System check identified no issues (0 silenced).
+ May 06, 2022 - 15:51:30
+ Django version 3.1.2, using settings 'Vis_aco.settings'
+ Starting development server at http://127.0.0.1:8000/
+ Quit the server with CTRL-BREAK.
 
   Click or copy this URL to a browser
 
