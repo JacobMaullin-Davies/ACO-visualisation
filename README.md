@@ -27,8 +27,11 @@ The iteration fitness overtime is shown on the chart below the map.
 * Requirements
 
  Anaconda - https://www.anaconda.com/
+ 
  OSMnx - street network data acquisition https://osmnx.readthedocs.io/en/stable/
+ 
  OpenRouteService API Key - provided in this application with free trial.
+ 
  Therefore limited number of requests can be made per hour/day.
 
 * Installation
