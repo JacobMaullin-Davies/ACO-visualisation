@@ -88,6 +88,7 @@
   <meta charset="utf-8">
   <title></title>
   </head>
+  <!-- Index page, for interaction of the map and area/marker selection.  -->
   <body>
     <div class = "select_area">
       <label>Area Range</label>
@@ -120,11 +121,11 @@
   <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
   <script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/leaflet.markercluster.js"></script>
   <script type="text/javascript">
-
+    //copyright
     var tileLayer = new L.TileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',{
       attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
     });
-
+    //create map through javascript Leaflet import
     var map = new L.Map('map', {
       // 'center': [51.75350586724182, -1.80169538827613],
       'center':[51.292149, -2.463861],
@@ -136,30 +137,100 @@
       selectArea: true ,
     });
 
+    //initialize variables
     var addAmarker = false
     var addArea = false
     var polygonLines = L.markerClusterGroup({interactive: false})
     var boundsArray = []
+    var status = 500
+    var markerArray = []
+    var markers = L.markerClusterGroup()
 
+    //map on click call
     map.on('click', addOption);
 
+
+    /*
+    area selected validation through API post request
+    */
+    function check_area(bound_check, bounds, area_select){
+      var area_type = document.getElementById("area_type").value;
+
+      var areaType = 'driving-car'
+      if (area_type == 'D'){
+        areaType = 'driving-car'
+      }else if (area_type == 'W'){
+        var areaType = 'foot-walking'
+      }else{
+        areaType = 'cycling-regular'
+      }
+
+      status = 500
+      console.log(areaType);
+
+      let request = new XMLHttpRequest();
+      //post request
+      request.open('POST', "https://api.openrouteservice.org/v2/isochrones/" + areaType);
+      request.setRequestHeader('Accept', 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8');
+      request.setRequestHeader('Content-Type', 'application/json');
+      request.setRequestHeader('Authorization', '5b3ce3597851110001cf624844229b68a7af4311b243a28407590a15');
+      //if the request state changes (area is selected)
+      request.onreadystatechange = function () {
+        if (this.readyState === 4) {
+          console.log('Status:', this.status);
+          //if valid
+          if (this.status == 200){
+            boundsArray = [bounds._southWest, bounds._northEast]
+            ajax_bounds = [bounds._southWest.lat, bounds._southWest.lng,
+                           bounds._northEast.lat, bounds._northEast.lng]
+           area_select.addTo(polygonLines);
+           polygonLines.addTo(map);
+         }else{
+           //not valid, remove existing area
+           boundsArray = []
+           ajax_bounds = []
+           try{
+             polygonLines.clearLayers()
+           }catch{
+             console.log("No area has been selected yet")
+           }
+         }
+
+        }
+      };
+
+      var body = {"locations": bound_check, "range":[100]};
+      var string = JSON.stringify(body);
+      request.send(string);
+    }
+
+    /*
+    Toggel function to change on click result
+    */
     function select_markers(){
       if (addArea){
         clearLayers();
       }
       addArea = (!addArea)
-
     }
 
+    /*
+    onClick map will add object depending on togglw switch select_markers
+    */
     function addOption(e){
       if (!addArea){
+        //add area
         add_areatoselect(e)
       }else{
+        //add a marker
         addMarker(e)
       }
 
     }
 
+    /*
+    add a box area to the map
+    */
     function add_areatoselect(e){
       try{
         polygonLines.clearLayers()
@@ -170,22 +241,21 @@
       var newMarker = new L.marker(e.latlng)
       var area_select = new L.Rectangle(new L.Circle([newMarker.getLatLng().lat,
         newMarker.getLatLng().lng], range_val).getBounds(),{color: "#ff7800", weight: 1, clickable : false, hover: false});
-      area_select.addTo(polygonLines);
-      polygonLines.addTo(map);
-
       bounds = (area_select.getBounds())
       console.log(bounds);
-      boundsArray = [bounds._southWest, bounds._northEast]
-      ajax_bounds = [bounds._southWest.lat, bounds._southWest.lng,
-                     bounds._northEast.lat, bounds._northEast.lng]
 
-    }
+      bounds_check = [[bounds._southWest.lng, bounds._southWest.lat],[bounds._northEast.lng, bounds._northEast.lat]]
+      //validation
+      check_area(bounds_check, bounds, area_select)
+      }
 
-    var markerArray = []
-    var markers = L.markerClusterGroup()
-
+    /*
+    add a marker to the map, validates if inside the bounding box
+    */
     function addMarker(e){
+      //check an area is defined
       if(boundsArray.length != 0){
+        //check number of makers limit
         if (markerArray.length == 4){
           console.log("Max points reached")
         }
@@ -193,7 +263,7 @@
           var newMarker = new L.marker(e.latlng)
           console.log(boundsArray);
           var bounds = new L.latLngBounds(boundsArray[0], boundsArray[1]);
-
+          //check maker is inside the area
           if (bounds.contains(e.latlng)){
             markers.addLayer(newMarker);
             map.addLayer(markers);
@@ -207,12 +277,16 @@
     }
   }
 
+    /*
+    gets existing area and marker points
+    */
     function getAllpionts(){
       if (markerArray.length != 4) {
         console.log("Not enough markers")
       }else{
         var area_type = document.getElementById("area_type");
         area_type = area_type.options[area_type.selectedIndex].text;
+        //django url request
         $.ajax({
                 url: "/locations_send",
                 type: 'get',
@@ -220,9 +294,12 @@
                       'bboxArray[]': ajax_bounds,
                       'areaType': area_type}
             })
-      }
     }
+  }
 
+    /*
+    clears the existing markers on the map
+    */
     function clearLayers(){
       console.log("Cleared")
       markerArray = [];

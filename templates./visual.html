@@ -83,17 +83,39 @@
       height: 40px;
       }
 
+      .loader {
+        border: 16px solid #f3f3f3;
+        border-radius: 50%;
+        border-top: 16px solid #3498db;
+        width: 120px;
+        height: 120px;
+        -webkit-animation: spin 2s linear infinite; /* Safari */
+        animation: spin 2s linear infinite;
+      }
+
+        /* Safari */
+        @-webkit-keyframes spin {
+          0% { -webkit-transform: rotate(0deg); }
+          100% { -webkit-transform: rotate(360deg); }
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
 
     </style>
   <meta charset="utf-8">
   <title></title>
   </head>
+  <!-- Visualisation page, where path data is displayed in the leaflet map -->
   <p></p>
   <body>
     {% load static %}
     <div class = "select_area">
       <button id = "button1" onclick = "reset()">Reset</button>
-      <button id = "button2" onclick = "run_steps_2()">Run Vis</button>
+      <button id = "button2" onclick = "run_visualisation()">Run Visualisation</button>
       <select name="algorithm" id="algo" onchange="toggle()">
         <option value="ACO-B">ACO-Basic</option>
         <option value="ACO-B">ACO-Leaders</option>
@@ -104,25 +126,38 @@
     </div>
     <br>
     <div class = "select_area">
-      <label for="quantity">Pheromone evaporate</label>
-      <input type="number" id="quantity" name="quantity" value="0.8" step="0.05" min="0.05" max="1">
-      <label for="quantity">Ant number</label>
-      <input type="number" id="ant_q" name="ant_q" value="50" step="2" min="2" max="100">
-      <label for="eva_q">Fitness evaluations</label>
-      <input type="number" id="eva_q" name="eva_q" value="10" step="5" min="10" max="200">
       <label>Speed</label>
       <input id='speed_id' name='speed' type="range" value="15" min="1" max="199" onchange="speed_set()">
       <br>
       <br>
       <div id="cont">
+        <label for="quantity">Pheromone evaporate</label>
+        <input type="number" id="quantity" name="quantity" value="0.8" step="0.05" min="0.05" max="0.95" required>
+        <label for="ant_q">Ant number</label>
+        <input type="number" id="ant_q" name="ant_q" value="50" step="2" min="2" max="100">
+        <label for="eva_q">Fitness evaluations</label>
+        <input type="number" id="eva_q" name="eva_q" value="50" step="5" min="10" max="200">
+        <label for="slider">Toggle shown ants</label>
         <label class="switch">
           <input type="checkbox">
           <span class="slider" id="multipath" onclick="toggle_ant_paths()"></span>
         </label>
+        <label for="max_p">Max pheromone</label>
+        <input type="number" id="max_p" name="max_p" value="0.9" step="0.05" min="0.5" max="1">
+        <label for="min_p">Min pheromone</label>
+        <input type="number" id="min_p" name="min_p" value="0.05" step="0.05" min="0.05" max="0.45">
+        <label for="beta">Beta rate</label>
+        <input type="number" id="beta" name="beta" value="0.1" step="0.01" min="0.01" max="0.3">
       </div>
     </div>
+    <p id="valid"></p>
 
     <div class="ex2">
+      <div id="loader" style = "display:none">
+        <label for="l1">Loading Environment....</label>
+        <div class="loader" id="l1"></div>
+      </div>
+
       <div class="ex1">
             <div id="map"></div>
       </div>
@@ -144,14 +179,18 @@
   <script src="https://api.tiles.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/leaflet.markercluster.js"></script>
   <script type="text/javascript">
 
-
+    //copyright
     var tileLayer = new L.TileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',{
       attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
     });
 
+    //initialise vairables
+    var runrequest = false;
+    var fail = false;
     var arr = [[]];
     var bbox = {{bbox}};
     var isPaused = false;
+    var v = false;
     var final = false;
     var graph_ev = [];
     var toggle_antPath_num = false;
@@ -162,12 +201,12 @@
     speed_set();
 
 
-
+    //tilelayer control, for line objects and ant
     var polygonLines = L.markerClusterGroup({interactive: false})
     var antMarkergroup = L.markerClusterGroup({interactive: false})
     var cirLines = L.layerGroup()
 
-
+    //initialise the map
     var map = new L.Map('map', {
       'center': [51.75350586724182, -1.80169538827613],
       'zoom': 10,
@@ -178,6 +217,8 @@
       selectArea: true ,
     });
 
+    //chart.js for display of the fitness.
+    //Every new run of a program will create a new dataset
     const ctx = document.getElementById("myChart");
     const chart = new Chart(ctx, {
       type: 'line',
@@ -221,11 +262,13 @@
     });
 
 
-
+    //Display area, if none is selcted from index page, then none is shown
     if(bbox.length != 0){
         map.fitBounds(bbox)
         var newMarker = new L.marker({{origin}}).addTo(map)
         var newMarker = new L.marker({{dest}}).addTo(map)
+
+        var e_pe = 0.75
 
         var LeafIcon = L.Icon.extend({
           options: {
@@ -244,13 +287,16 @@
         L.rectangle(bounds, {color: "#ff7800", weight: 1, clickable : false, hover: false}).addTo(map);
     }
 
-
+    /*
+    Add a dataset for the algorthm runtime data
+    */
     function graph_add_dataset(algorithm, eval_num){
       colour_dataset = []
+      //ensure that each dataset will have a differing colour
       var color = Math.floor((Math.random()*1000000)+1);
       colour_dataset.push("#" + ("000000" + color.toString(16)).slice(-6));
 
-
+      //dataset
       var datasets = {
           fill: false,
           label: algorithm,
@@ -271,7 +317,9 @@
       dataset_num ++
     }
 
-
+    /*
+    Update the chart with new data for the path fitness
+    */
     function chart_update(resp){
       if(!final){
         if(resp.runType == false){
@@ -288,6 +336,9 @@
       }
     }
 
+  /*
+  Reset function to remove all path data displayed
+  */
   function reset(){
     isPaused = false;
     final = false;
@@ -304,7 +355,7 @@
     }catch{
       console.log("No lines to clear")
     }
-
+    //reset call request
     $.ajax({
             url: "/reset_path",
             type: 'get',
@@ -312,6 +363,9 @@
     //location.reload()
   }
 
+  /*
+  Function to set the speed of the displayed path
+  */
   function speed_set(){
     speed = document.getElementById('speed_id').value
     speed = Math.round(200-speed)
@@ -324,13 +378,20 @@
     }else if (speed > 50){
         increment = 15;
         increment_over = increment-1
-    }else{
+    }else if (speed > 10){
       increment = 20;
       increment_over = increment-1
+    }else{
+      increment = 100;
+      increment_over = increment-1;
     }
     console.log(speed);
   }
 
+  /*
+  Toggle function only allows parameter settings for ACO algorithms,
+  Dijkstra or DFS do not use these parameters, therefore are not displayed
+  */
   function toggle(){
     var cont = document.getElementById('cont');
     var e_a = document.getElementById("algo");
@@ -350,12 +411,17 @@
     }
   }
 
-
+  /*
+  Toggels how many paths are displayed
+  */
   function toggle_ant_paths(){
     toggle_antPath_num = !toggle_antPath_num
     console.log(toggle_antPath_num)
   }
 
+  /*
+  Runtime displayis finsihed and therefore call to stop the runtime display
+  */
   function path_finish(){
     $.ajax({
             url: "/path_finish",
@@ -365,18 +431,34 @@
   }
 
 
-
+  /*
+  Delay inbetween path visualisation
+  */
   function delay(time) {
     return new Promise(resolve => setTimeout(resolve, time));
   }
 
-  function evaporate(){
-    for (var i = 0; i < (graph_ev.length/1.7); i++) {
-      polygonLines.removeLayer(graph_ev[i])
+  /*
+  Evapouration function that removes line objects from the arraylist
+  This shows the progress of the ACO algorithm behaviour
+  */
+  function evaporate(path_numM){
+    if(path_numM){
+      for (var i = 0; i < (graph_ev.length/1.8); i++) {
+        polygonLines.removeLayer(graph_ev[i])
+      }
+    }else{
+      var e_pe = document.getElementById("quantity").value;
+      for (var i = 0; i < (graph_ev.length/1.4); i++) {
+        polygonLines.removeLayer(graph_ev[i])
+      }
     }
 
   }
 
+  /*
+  async function that shows the steps of nodes visted by dfs and dijkstra
+  */
   async function show_points(){
       for (var i = 0; i < arr.length; i++) {
         await delay(speed);
@@ -388,13 +470,25 @@
       path_finish()
   }
 
-
+    /*
+    async function that shows the steps of nodes visted by ACO, drawing lineobject
+    data as polygon lines
+    */
     async function run_steps(resp) {
+      //check length is not none
       if (arr.length > 0){
+        //check what type of algorithm is called, if true then dfs and dijkstra
+        //data is shown in show_points()
+        //otherwise false and show point data from ACO
         if(resp.runType == false){
+          //check path num, which is a bool to determin how many ant data is
+          //received. Thsi shows more than 1 ant path
           if(resp.path_num){
+            //for all ants
             for (var i = 0; i < arr.length; i++) {
               var break_arr = arr[i]
+              //for each pathdatapoint
+              //speed to how many points are drawn in the array
               for (var j = 0; j < break_arr.length; j+=increment_over) {
                 await delay(speed);
                 var new_arr = break_arr.slice(j, j+increment);
@@ -402,9 +496,11 @@
             }
           }
             if(!final){
-              evaporate()
+              evaporate(resp.path_num)
             }
           }else{
+            //for each path datapoint
+            //speed to how many points are drawn in the array
             for (var i = 0; i < arr.length; i+=increment_over) {
               await delay(speed);
               var new_arr = arr.slice(i, i+increment);
@@ -412,7 +508,7 @@
             }
           }
           if(!final){
-            evaporate()
+            evaporate(resp.path_num)
           }
           path_finish()
         }else{
@@ -421,57 +517,164 @@
     }
   }
 
-    function drawDottedLine(points, cc){
-      if (!final){
-        var polyline = new L.polyline(points)
-        graph_ev.push(polyline)
-        polyline.setStyle({color: cc, opacity: 0.1});
-        polyline.addTo(polygonLines);
-      }else{
-        var polyline = new L.polyline(points)
-        graph_ev.push(polyline)
-        polyline.setStyle({color: 'red', opacity: 0.9});
-        polyline.addTo(polygonLines);
-      }
-      polygonLines.addTo(map) //add to map above
-      antMarker.setLatLng(points.at(-1))
+  /*
+  Function that drwas the polygon lines of the ACO path data
+  */
+  function drawDottedLine(points, cc){
+    if (!final){
+      var polyline = new L.polyline(points)
+      graph_ev.push(polyline)
+      polyline.setStyle({color: cc, opacity: 0.1});
+      polyline.addTo(polygonLines);
+    }else{
+      //if the final output, the path is highlighted in red
+      var polyline = new L.polyline(points)
+      graph_ev.push(polyline)
+      polyline.setStyle({color: 'red', opacity: 0.9});
+      polyline.addTo(polygonLines);
+    }
+    polygonLines.addTo(map) //add to map above
+    antMarker.setLatLng(points.at(-1))
+  }
+
+
+  /*
+  Param function to check that inputs are valid
+  */
+  function check(){
+    var text = " "
+    var e_a = document.getElementById("algo");
+    var algorithm = e_a.options[e_a.selectedIndex].text;
+    var e_pe = document.getElementById("quantity").value;
+    var ant_num  = document.getElementById("ant_q").value;
+    var eva_q = document.getElementById('eva_q').value;
+    var max_p = document.getElementById('max_p').value;
+    var min_p =  document.getElementById('min_p').value;
+    var beta = document.getElementById('beta').value;
+
+    if (isNaN(e_pe) || e_pe > 0.99 || e_pe < 0.01) {
+        text = "Input not valid for evaporation";
+        v = false
+        return false, text
+    }
+    if (isNaN(ant_num) || ant_num % 1 != 0 || ant_num < 1 || ant_num > 150) {
+        text = "Input not valid for ant amount ";
+        v = false
+        return false, text
+    }
+    if (isNaN(eva_q) || eva_q % 1 != 0 || eva_q < 5 || eva_q > 150) {
+        text = "Input not valid for iteration amount";
+        v = false
+        return false, text
+    }
+    if (isNaN(max_p) || max_p < 0.5 || max_p > 0.99) {
+        text = "Input not valid for max pheromone amount";
+        v = false
+        return false, text
+    }
+    if (isNaN(min_p) || min_p < 0.01 || min_p > 0.45) {
+        text = "Input not valid for min pheromone amount";
+        v = false
+        return false, text
+    }
+    if (isNaN(beta) || beta < 0.01 || beta > 0.99) {
+        text = "Input not valid for beta pheromone amount";
+        v = false
+        return false, text
     }
 
-    function run_steps_2(){
+    v = true
+
+    return v, text
+
+  }
+
+
+
+    /*
+    Function to start the visualisation process. Param data is collected and
+    sent through the django url to setup the search algorithm selected
+    */
+    function run_visualisation(){
       if (bbox.length != 0){
-        reset()
-        var e_a = document.getElementById("algo");
-        var algorithm = e_a.options[e_a.selectedIndex].text;
-        var e_pe = document.getElementById("quantity").value;
-        var ant_num  = document.getElementById("ant_q").value;
-        var eva_q = document.getElementById('eva_q').value;
+        if (runrequest){ //if an algorithm is currently running, log console.error();
+          //esures no overwriting of data and iteration time
+          console.log("Currently running");
+        }else{
+          runrequest = true
+          reset()
+          var e_a = document.getElementById("algo");
+          var algorithm = e_a.options[e_a.selectedIndex].text;
+          var e_pe = document.getElementById("quantity").value;
+          var ant_num  = document.getElementById("ant_q").value;
+          var eva_q = document.getElementById('eva_q').value;
+          var max_p = document.getElementById('max_p').value;
+          var min_p =  document.getElementById('min_p').value;
+          var beta = document.getElementById('beta').value;
+          //verify the inputs
+          v, text = check()
+          console.log(v, text)
+          if (v == false){
+            document.getElementById("valid").innerHTML = text;
+          }else{
+            document.getElementById("valid").innerHTML = " ";
 
-        while (colors.length < Math.round(ant_num*0.1)) {
-            do {
-                var color = Math.floor((Math.random()*1000000)+1);
-            } while (colors.indexOf(color) >= 0);
-            colors.push("#" + ("000000" + color.toString(16)).slice(-6));
+            while (colors.length < Math.round(ant_num*0.1)) {
+                do {
+                    var color = Math.floor((Math.random()*1000000)+1);
+                } while (colors.indexOf(color) >= 0);
+                colors.push("#" + ("000000" + color.toString(16)).slice(-6));
+            }
+            console.log(colors);
+            //initialise a dataset on the chart
+
+
+
+            graph_add_dataset(algorithm, eva_q)
+            //call request to django url
+            $.ajax({
+                    url: "/path_start",
+                    type: 'get',
+                    data: {'a_type': algorithm,
+                           'evap_val': e_pe,
+                           'max_p' : max_p,
+                           'min_p' : min_p,
+                           'beta_val' : beta,
+                           'ant_num': ant_num,
+                           'eval_num': eva_q,
+                           'path_toggle': toggle_antPath_num
+
+                         },
+                         success: function(resp){
+                           console.log(resp)
+                          }
+                })
+          }
         }
-        console.log(colors);
 
-        graph_add_dataset(algorithm, eva_q)
-
-        $.ajax({
-                url: "/path_start",
-                type: 'get',
-                data: {'a_type': algorithm,
-                       'evap_val': e_pe,
-                       'ant_num': ant_num,
-                       'eval_num': eva_q,
-                       'path_toggle': toggle_antPath_num
-
-                     }
-            })
+        //interval fucntion that calls a url to get path data on a loop until the
+        //final path is returned where a stop fucntion is called
+        //if there is an osmnx data error, or the target points are not reachable
+        // then this is raised and the program will #halt
         var t = window.setInterval(function() {
           if(!isPaused) {
             fetch('../api_pointUpdate')
             .then(response => response.json())
             .then(resp => {
+              if(resp.Load){
+                console.log(resp.error_message);
+                //console.log("data error");
+                document.getElementById("valid").innerHTML = resp.error_message;
+                 window.clearInterval(t);
+              }else{
+              //display loading while wiating for resp
+              var loader = document.getElementById('loader');
+              if(resp.array.length == 0){
+                  loader.style.display = 'block';
+              }else{
+                loader.style.display = 'none';
+              }
+            //if resp is final path
             if (resp.done){
                  console.log("FIN")
                  window.clearInterval(t);
@@ -479,6 +682,7 @@
                  arr = resp.array;
                  run_steps(resp);
                  chart_update(resp);
+                 runrequest = false
             }else{
               if (resp.running){
                 if(resp.array.length == 0){
@@ -490,16 +694,22 @@
                 }else{
                   arr = resp.array;
                   isPaused = true;
+                  //show path data
                   run_steps(resp);
+                  //display fitness on chart
                   chart_update(resp);
                 }
               }
             }
+          }
           });
         }
       }, 300);
+
     }
-  }
+    }
+
+
 
 
 </script>
