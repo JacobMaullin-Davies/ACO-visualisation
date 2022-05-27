@@ -20,14 +20,14 @@ from django.conf.urls.static import static
 from django.conf import settings
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', main_view.index, name='index'),
-    path('visual/', main_view.visualisation, name='visual'),
-    path("locations_send/", main_view.locations),
-    path("api_pointUpdate/", main_view.points_api),
-    path("path_start/", main_view.vis_logic),
-    path("path_finish/", main_view.vis_finish),
-    path("reset_path", main_view.reset_path_run)
+    path('admin/', admin.site.urls), #admin
+    path('', main_view.index, name='index'), # index page
+    path('visual/', main_view.visualisation, name='visual'), # visual page
+    path("locations_send/", main_view.locations), # location data send
+    path("api_pointUpdate/", main_view.points_api), # update request for data for each iteration
+    path("path_start/", main_view.vis_logic), # start run request
+    path("path_finish/", main_view.vis_finish), # stop run request
+    path("reset_path", main_view.reset_path_run), # reset data request
 
 ]
 
