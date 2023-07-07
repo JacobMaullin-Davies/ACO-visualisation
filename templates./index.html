@@ -173,7 +173,7 @@
       request.open('POST', "https://api.openrouteservice.org/v2/isochrones/" + areaType);
       request.setRequestHeader('Accept', 'application/json, application/geo+json, application/gpx+xml, img/png; charset=utf-8');
       request.setRequestHeader('Content-Type', 'application/json');
-      request.setRequestHeader('Authorization', '5b3ce3597851110001cf624844229b68a7af4311b243a28407590a15');
+      request.setRequestHeader('Authorization', 'APIKEY');
       //if the request state changes (area is selected)
       request.onreadystatechange = function () {
         if (this.readyState === 4) {
